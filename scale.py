@@ -2,8 +2,8 @@
 
 Gathers scalability metrics from APIC for comparison with scalability guide.
 
-Based on the "Large L3 Fabric" profile for 2.2. See "limit" variables for
-support of new limits.
+Based on 3.0 scalability guide.
+Adjust the second variable to the "result" function to change the threshold.
 """
 from __future__ import print_function
 from collections import Counter
