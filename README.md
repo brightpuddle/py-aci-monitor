@@ -16,3 +16,4 @@ Tested under Python 2.7.11, but it should be compatible with Python 3.
 **Options:**
 
 -v --verbose -- Verbose output. Prints the raw data used to derive the scale metrics.
+-h --help -- Print usage info.
