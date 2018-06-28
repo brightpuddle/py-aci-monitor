@@ -24,5 +24,6 @@ Scalability assessment
 optional arguments:
   -h, --help     show this help message and exit
   -v, --verbose  Verbose
-aci $
 ```
+
+The verbose option prints the raw data used to derive the scalability metrics.
