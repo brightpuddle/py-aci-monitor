@@ -15,6 +15,14 @@ Tested under Python 2.7.11, but it should be compatible with Python 3.
 
 **Options:**
 
--v --verbose -- Verbose output. Prints the raw data used to derive the scale metrics.
+```
+aci $ python scale.py --help
+usage: scale [-h] [-v]
 
--h --help -- Print usage info.
+Scalability assessment
+
+optional arguments:
+  -h, --help     show this help message and exit
+  -v, --verbose  Verbose
+aci $
+```
