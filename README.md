@@ -2,7 +2,7 @@
 
 A collection of various tools to work with Cisco ACI.
 
-## Scalability analysis (scale.py
+## Scalability analysis (scale.py)
 
 This script checks scalability metrics. As of ACI software 3.x, the scalability dashboard capabilities largely overlap with the script, though, not entirely. Additional checks may be added in the future.
 
