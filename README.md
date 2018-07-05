@@ -22,8 +22,9 @@ usage: scale [-h] [-v]
 Scalability assessment
 
 optional arguments:
-  -h, --help     show this help message and exit
-  -v, --verbose  Verbose
+  -h, --help               show this help message and exit
+  -o FILE, --output FILE   Output filename (default: stdout)
+  -v, --verbose            Verbose
 ```
 
 The verbose option prints the raw data used to derive the scalability metrics.
