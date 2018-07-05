@@ -7,7 +7,7 @@ Adjust the second variable to the "result" function to change the threshold.
 """
 from __future__ import print_function
 from collections import Counter
-from pprint import pprint
+from pprint import pprint, pformat
 from getpass import getpass
 import argparse
 from termcolor import colored
@@ -19,9 +19,7 @@ TESTS = []
 
 verbose = False
 
-SCALE_OK = 1
-SCALE_WARNING = 2
-SCALE_ERROR = 3
+SCALE_OK, SCALE_WARNING, SCALE_ERROR = 1, 2, 3
 THRESHOLD = .75
 
 
@@ -32,9 +30,30 @@ THRESHOLD = .75
 parser = argparse.ArgumentParser(prog='scale', 
         description='Scalability assessment')
 parser.add_argument('-v', '--verbose', action='store_true', help='Verbose')
+parser.add_argument('-o', '--output', help='Output filename')
+
+
+def log(s):
+    """Default stdio logger"""
+    if type(s) == str:
+        print(s)
+    else:
+        pprint(s)
+
+
+def file_logger(fn):
+    """File logger if -o option is used"""
+    f = open(fn, 'w')
+    def logger(s):
+        if type(s) != str:
+            s = pformat(s)
+        f.write(s + '\n')
+    return logger
+
 
 
 def dn(object, count=0):
+    """Shortcut for returning parent DNs"""
     result = object if type(object) == Dn else object.dn
     while count:
         result = result.getParent()
@@ -62,9 +81,9 @@ def login():
 def result(count, limit, detail):
     """Print the test results and return true for pass"""
     threshold = float(count) / limit
-    print('{} of {} - {}%'.format(count, limit, round(threshold * 100, 2)))
+    log('{} of {} - {}%'.format(count, limit, round(threshold * 100, 2)))
     if globals()['verbose']:
-        pprint(detail)
+        log(detail)
     if count >= limit:
         return SCALE_ERROR
     if threshold >= THRESHOLD:
@@ -308,12 +327,12 @@ def get_multicast_groups_per_vrf(_modir):
 def run_tests(tests, modir):
     """Main test runner"""
     for test in tests:
-        print('\n', colored(test.__doc__ + '\n' + ('=' * 60), 'green'))
+        log('\n' + colored(test.__doc__ + '\n' + ('=' * 60), 'green'))
         scale_status = test(modir)
         if scale_status == SCALE_WARNING:
-            print(colored('Approaching scale limit', 'yellow'))
+            log(colored('Approaching scale limit', 'yellow'))
         if scale_status == SCALE_ERROR:
-            print(colored('Over scale', 'red'))
+            log(colored('Over scale', 'red'))
 
 
 def main():
@@ -322,6 +341,8 @@ def main():
         args = parser.parse_args()
         if args.verbose:
             globals()['verbose'] = True
+        if args.output:
+            globals()['log'] = file_logger(args.output)
         modir = login()
         run_tests(TESTS, modir)
     except KeyboardInterrupt:
