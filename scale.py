@@ -30,7 +30,7 @@ THRESHOLD = .75
 parser = argparse.ArgumentParser(prog='scale', 
         description='Scalability assessment')
 parser.add_argument('-v', '--verbose', action='store_true', help='Verbose')
-parser.add_argument('-o', '--output', help='Output filename')
+parser.add_argument('-o', '--output', help='Output filename (default: stdout)')
 
 
 def log(s):
