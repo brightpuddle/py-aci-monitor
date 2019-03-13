@@ -6,12 +6,12 @@ A collection of various tools to work with Cisco ACI.
 
 Monitor upgrade status of the ACI fabric.
 
-**Requirements**
+**Requirements:**
 ```
-pip install requests
-pip install termcolor
+pip install requests termcolor
 ```
 
+**Usage:**
 ```
 aci-github $ python upgrade_monitor.py -h
 usage: upgrade_monitor.py [-h] [-u USR] [-p PWD] [-v] [-d]
@@ -52,7 +52,7 @@ This script checks scalability metrics. As of ACI software 3.x, the scalability 
 
 Tested under Python 2.7.11, but it should be compatible with Python 3.
 
-**Options:**
+**Usage:**
 
 ```
 aci-github $ python scale.py --help
