@@ -34,11 +34,11 @@ optional arguments:
   -v, --verbose         verbose
   -d, --debug           Debugging output
   --request_interval REQUEST_INTERVAL
-                        Interval between querying devices (seconds)
+                        Interval between querying devices (default 10s)
   --login_interval LOGIN_INTERVAL
-                        Interval between APIC login attempts (seconds)
+                        Interval between APIC login attempts (default 60s)
   --token_refresh_interval TOKEN_REFRESH_INTERVAL
-                        Seconds between token refresh
+                        Seconds between token refresh (default 480s)
 ```
 
 ## Scalability analysis (scale.py)

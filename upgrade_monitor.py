@@ -61,6 +61,7 @@ class AuthException(Exception):
 
 
 def Option(data):
+    """Create option type"""
     if isinstance(data, Something):
         return data
     if data is not None:
@@ -69,6 +70,8 @@ def Option(data):
 
 
 class Something(object):
+    """Option type wrapper for safe attribute access"""
+
     def __init__(self, data):
         self.data = data
 
@@ -159,6 +162,9 @@ class APIC(object):
 
 def get_options():
     """Parse command line args"""
+    DEFAULT_REQUEST_INTERVAL = 10
+    DEFAULT_LOGIN_INTERVAL = 60
+    DEFAULT_TOKEN_REFRESH = 60 * 8
     parser = argparse.ArgumentParser(description='Monitor ACI upgrade status.')
     parser.add_argument('-u', '--username', dest='usr', help='username')
     parser.add_argument('-p', '--password', dest='pwd', help='password')
@@ -174,20 +180,23 @@ def get_options():
         '--request_interval',
         dest='request_interval',
         type=int,
-        default=10,
-        help='Interval between querying devices (seconds)')
+        default=DEFAULT_REQUEST_INTERVAL,
+        help='Interval between querying devices (default %ss)' %
+        DEFAULT_REQUEST_INTERVAL)
     parser.add_argument(
         '--login_interval',
         dest='login_interval',
         type=int,
-        default=60,
-        help='Interval between APIC login attempts (seconds)')
+        default=DEFAULT_LOGIN_INTERVAL,
+        help='Interval between APIC login attempts (default %ss)' %
+        DEFAULT_LOGIN_INTERVAL)
     parser.add_argument(
         '--token_refresh_interval',
         dest='token_refresh_interval',
         type=int,
-        default=60 * 8,
-        help='Seconds between token refresh')
+        default=DEFAULT_TOKEN_REFRESH,
+        help='Seconds between token refresh (default %ss)' %
+        DEFAULT_TOKEN_REFRESH)
     parser.add_argument('ip', help='APIC IP address')
     args = parser.parse_args()
     if not args.usr:
@@ -207,8 +216,9 @@ def get_devices(apic):
 
 def get_apic_status(apic, device):
     """Get APIC upgrade status"""
-    url_job = '/api/mo/%s/ctrlrfwstatuscont/upgjob' % device['dn']
-    url_running = '/api/mo/%s/ctrlrfwstatuscont/ctrlrrunning' % device['dn']
+    dn = device['dn'].value()
+    url_job = '/api/mo/%s/ctrlrfwstatuscont/upgjob' % dn
+    url_running = '/api/mo/%s/ctrlrfwstatuscont/ctrlrrunning' % dn
     status = apic.get(url_job)[0]['maintUpgJob']['attributes']
     running = apic.get(url_running)[0]['firmwareCtrlrRunning']['attributes']
     return {'device': device, 'status': status, 'running': running}
@@ -216,8 +226,9 @@ def get_apic_status(apic, device):
 
 def get_switch_status(apic, device):
     """Get switch upgrade status"""
-    url_job = '/api/mo/%s/fwstatuscont/upgjob' % device['dn']
-    url_running = '/api/mo/%s/fwstatuscont/running' % device['dn']
+    dn = device['dn'].value()
+    url_job = '/api/mo/%s/fwstatuscont/upgjob' % dn
+    url_running = '/api/mo/%s/fwstatuscont/running' % dn
     status = apic.get(url_job)[0]['maintUpgJob']['attributes']
     running = apic.get(url_running)[0]['firmwareRunning']['attributes']
     return {'device': device, 'status': status, 'running': running}
