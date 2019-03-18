@@ -437,7 +437,7 @@ def check_faults(apic: APIC) -> None:
         if dn not in apic.faults and severity != 'cleared':
             new_faults.append(fault)
     if len(new_faults) > 0:
-        log_e('Fault Status',
+        log_w('Fault Status',
               '%s new fault(s) since previous snapshot.' % len(new_faults))
         for fault in new_faults:
             if apic.options.debug:
