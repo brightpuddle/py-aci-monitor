@@ -7,20 +7,26 @@ This script is provided as is. No support is implied.
 
 """
 from __future__ import print_function
+from __future__ import with_statement
 from pprint import pformat
 from getpass import getpass
 import time
 import json
 import sys
+import os
 import argparse
 import traceback
 # import websocket
+
+# if sys.version_info[0] < 3:
+#     print('This script requires python 3.')
+#     exit()
 
 DEPS = ['requests', 'termcolor']
 
 try:
     import requests
-    import urllib3
+    import urllib3  # type: ignore
     from termcolor import colored
     from requests.exceptions import ConnectionError, Timeout
 except ModuleNotFoundError:
@@ -30,18 +36,27 @@ except ModuleNotFoundError:
     exit()
 
 if hasattr(__builtins__, 'raw_input'):
-    # Python 2/3 compatibility
     input = __builtins__.raw_input
 
 urllib3.disable_warnings()
 
 
-def inline_progress(message, percent):
+def add1(x: int) -> int:
+    return x + 1
+
+
+add1("w00t")
+
+
+def inline_progress(message, percent):  # type: (str, int) -> None
+    """Print progress inline, overwriting current line"""
     sys.stdout.write(message % percent + '\r')
     sys.stdout.flush()
 
 
 def logger(color):
+    """Log results"""
+
     def _logger(header, data, *args):
         if isinstance(data, dict) or isinstance(data, list):
             print(colored('\n[%s]\n' % header, color), pformat(data))
@@ -106,62 +121,69 @@ class Something(object):
 
 
 class APIC(object):
-    """APIC auth and request wrapper"""
+    """APIC state data"""
 
     def __init__(self, options):
         self.options = options
         self.jar = None
         self.start_time = time.time()
+        self.last_refresh = 0
 
+
+def request(apic, method, relative_url, data={}):
+    """Return raw requests result"""
     # TODO websocket would be more efficient
     # See ACItoolkit, acisession.py, line 275-ish
+    url = 'https://%s%s.json' % (apic.options.ip, relative_url)
+    if apic.options.verbose:
+        log_i(method, url)
+    if method == 'POST':
+        return requests.post(
+            url,
+            cookies=apic.jar,
+            data=json.dumps(data),
+            verify=False,
+            timeout=30)
+    return requests.get(url, cookies=apic.jar, verify=False, timeout=30)
 
-    def _request(self, method, relative_url, data={}):
-        """Return raw requests result"""
-        url = 'https://%s%s.json' % (self.options.ip, relative_url)
-        if self.options.verbose:
-            log_i(method, url)
-        if method == 'POST':
-            return requests.post(
-                url,
-                cookies=self.jar,
-                data=json.dumps(data),
-                verify=False,
-                timeout=30)
-        return requests.get(url, cookies=self.jar, verify=False, timeout=30)
 
-    def get(self, relative_url):
-        self._refresh_token()
-        res = self._request('GET', relative_url)
-        return Option(res.json())['imdata']
+def get(apic, relative_url):  # type: (APIC, str) -> Something
+    """Fetch and unwrap API request"""
+    refresh_token(apic)
+    res = request(apic, 'GET', relative_url)
+    return Option(res.json())['imdata']
 
-    def login(self):
-        res = self._request(
-            'POST', '/api/aaaLogin', {
-                'aaaUser': {
-                    'attributes': {
-                        'name': self.options.usr,
-                        'pwd': self.options.pwd
-                    }
+
+def login(apic):  # type: (APIC) -> APIC
+    """Login to the APIC"""
+    res = request(
+        apic, 'POST', '/api/aaaLogin', {
+            'aaaUser': {
+                'attributes': {
+                    'name': apic.options.usr,
+                    'pwd': apic.options.pwd
                 }
-            })
-        if Option(res.json())['imdata'][0]['error']:
-            raise AuthException('Authentication error.')
-        self.jar = res.cookies
-        self.last_refresh = time.time()
-        return self
-
-    def _refresh_token(self):
-        elapsed_time = time.time() - self.last_refresh
-        if elapsed_time > self.options.token_refresh_interval:
-            res = self._request('GET', '/api/aaaRefresh')
-            self.jar = res.cookies
-            self.last_refresh = time.time()
-        return self
+            }
+        })
+    if Option(res.json())['imdata'][0]['error']:
+        raise AuthException('Authentication error.')
+    apic.jar = res.cookies
+    apic.last_refresh = time.time()
+    return apic
 
 
-def get_options():
-    """Parse command line args"""
+def refresh_token(apic):  # type: (APIC) -> APIC
+    """Check last token refresh and refresh if needed"""
+    elapsed_time = time.time() - apic.last_refresh
+    if elapsed_time > apic.options.token_refresh_interval:
+        res = request(apic, 'GET', '/api/aaaRefresh')
+        apic.jar = res.cookies
+        apic.last_refresh = time.time()
+    return apic
+
+
+def get_options():  # type: () -> argparse.Namespace
+    """Parse command line args."""
     DEFAULT_REQUEST_INTERVAL = 10
     DEFAULT_LOGIN_INTERVAL = 60
     DEFAULT_TOKEN_REFRESH = 60 * 8
@@ -171,11 +193,17 @@ def get_options():
     parser.add_argument(
         '-v', '--verbose', dest="verbose", action='store_true', help='verbose')
     parser.add_argument(
+        '-s',
+        '--snapshot',
+        dest='snapshot',
+        default='snapshot.json',
+        help='snapshot filename (default snapshot.json)')
+    parser.add_argument(
         '-d',
         '--debug',
         dest="debug",
         action='store_true',
-        help='Debugging output')
+        help='Debugging output (print all JSON)')
     parser.add_argument(
         '--request_interval',
         dest='request_interval',
@@ -200,7 +228,7 @@ def get_options():
     parser.add_argument('ip', help='APIC IP address')
     args = parser.parse_args()
     if not args.usr:
-        args.usr = input('Username: ')
+        args.usr = input('Username: ')  # type: ignore
     if not args.pwd:
         args.pwd = getpass('Password: ')
     if not args.ip:
@@ -208,33 +236,33 @@ def get_options():
     return args
 
 
-def get_devices(apic):
-    """Get list of all devices on fabric"""
-    devices = apic.get('/api/class/topSystem')
+def get_devices(apic):  # type: (APIC) -> list(Something)
+    """Get list of all devices on fabric."""
+    devices = get(apic, '/api/class/topSystem')
     return [Option(d)['topSystem']['attributes'] for d in devices]
 
 
-def get_apic_status(apic, device):
-    """Get APIC upgrade status"""
+def get_apic_status(apic, device):  # type: (APIC, list(Something)) -> dict
+    """Get APIC upgrade status."""
     dn = device['dn'].value()
     url_job = '/api/mo/%s/ctrlrfwstatuscont/upgjob' % dn
     url_running = '/api/mo/%s/ctrlrfwstatuscont/ctrlrrunning' % dn
-    status = apic.get(url_job)[0]['maintUpgJob']['attributes']
-    running = apic.get(url_running)[0]['firmwareCtrlrRunning']['attributes']
+    status = get(apic, url_job)[0]['maintUpgJob']['attributes']
+    running = get(apic, url_running)[0]['firmwareCtrlrRunning']['attributes']
     return {'device': device, 'status': status, 'running': running}
 
 
-def get_switch_status(apic, device):
-    """Get switch upgrade status"""
+def get_switch_status(apic, device):  # type: (APIC, list(Something)) -> dict
+    """Get switch upgrade status."""
     dn = device['dn'].value()
     url_job = '/api/mo/%s/fwstatuscont/upgjob' % dn
     url_running = '/api/mo/%s/fwstatuscont/running' % dn
-    status = apic.get(url_job)[0]['maintUpgJob']['attributes']
-    running = apic.get(url_running)[0]['firmwareRunning']['attributes']
+    status = get(apic, url_job)[0]['maintUpgJob']['attributes']
+    running = get(apic, url_running)[0]['firmwareRunning']['attributes']
     return {'device': device, 'status': status, 'running': running}
 
 
-def get_device_status(apic, devices):
+def get_device_status(apic, devices):  # type (APIC, dict) -> dict
     """Upgrade status for any device type"""
     # TODO this should probably be threaded.
     # May take a while for a large fabric.
@@ -265,7 +293,8 @@ def get_device_status(apic, devices):
     return result  # {device: ..., status: ..., running: ...}
 
 
-def parse_upgrade_state(apic, status):
+def parse_upgrade_state(apic, status):  # type: (APIC, list(dict)) -> str
+    """Parse and print upgrade status details."""
     scheduled_devices = []
     queued_devices = []
     upgrading_devices = []
@@ -353,14 +382,33 @@ def parse_upgrade_state(apic, status):
     return 'upgrading'
 
 
-def request_loop(apic, devices):
+def get_faults(apic):  # type: (APIC) -> list(Something)
+    """Get fault list w/ details."""
+    faults = get(apic, '/api/class/faultInfo')
+    return [fault['faultInst']['attributes'] for fault in faults]
+
+
+def load_snapshot(apic):  # type: (APIC) -> list(Something)
+    """Load/create snapshot"""
+    fn = apic.options.snapshot
+    faults = get_faults(apic)
+    if not os.path.isfile(fn):
+        with open(fn, 'w') as f:
+            log_i('Snapshot', 'Creating new snapshot %s...' % fn)
+            f.write(json.dumps([fault.value() for fault in faults]))
+            return faults
+    with open(fn, 'r') as f:
+        log_i('Snapshot', 'Loading snapshot %s...' % fn)
+        return [Something(fault) for fault in json.loads(f.read())]
+
+
+def request_loop(apic, devices):  # type: (APIC, list(Something)) -> None
     """Monitor status."""
     while True:
         results = get_device_status(apic, devices)
         upgrade_state = parse_upgrade_state(apic, results)
         if upgrade_state == 'stable':
-            # TODO additional checks, e.g. ISIS metrics, etc
-            pass
+            get_faults(apic, devices)
         elapsed_time = round(time.time() - apic.start_time)
         if apic.options.verbose:
             log_i('Timer', 'Total run time: %d seconds.' % elapsed_time)
@@ -369,8 +417,8 @@ def request_loop(apic, devices):
         time.sleep(apic.options.request_interval)
 
 
-def main_loop(apic):
-    """Login and handle errors."""
+def main_loop(apic):  # type: (APIC) -> None
+    """Login and handle connecitivity exceptions."""
     devices = get_devices(apic)
     while True:
         try:
@@ -391,20 +439,33 @@ def main_loop(apic):
             print('Note: this is expected when the APIC first boots.')
 
 
-if __name__ == '__main__':
+def main():  # type: () -> None
+    """Initial entry and top-level exception handling."""
     while True:
         try:
-            apic = APIC(get_options()).login()
+            apic = login(APIC(get_options()))
+            #
+            #
+            #
             main_loop(apic)
         except KeyboardInterrupt:
             exit()
         except ConnectionError:
             log_e('Connection Failed',
-                  'Please check your login details and try again.')
+                  'Please check the IP address and try again.')
+            exit()
+        except AuthException:
+            log_e('Authentication Failed',
+                  'Please check your credentials and try again.')
             exit()
         except Exception as e:
+            # Run forever unless intentionally failing
             WAIT = 10
             log_e('Unexpected Error', str(e))
             traceback.print_exc()
             print('Trying again in %d seconds...' % WAIT)
             time.sleep(WAIT)
+
+
+if __name__ == '__main__':
+    main()
