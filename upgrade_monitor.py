@@ -120,6 +120,7 @@ class APIC(object):
         self.jar = None
         self.start_time = time.time()
         self.faults = []  # type: List[str]
+        self.devices = []  # type: List[Something]
         self.last_refresh = 0
 
 
@@ -232,7 +233,7 @@ def get_options() -> argparse.Namespace:
 def get_devices(apic: APIC) -> List[Something]:
     """Get list of all devices on fabric."""
     devices = get(apic, '/api/class/topSystem')
-    return [Option(d)['topSystem']['attributes'] for d in devices]
+    return [d['topSystem']['attributes'] for d in devices]
 
 
 def get_apic_status(apic: APIC, device: Something) -> Dict[str, Something]:
@@ -255,14 +256,13 @@ def get_switch_status(apic: APIC, device: Something) -> Dict[str, Something]:
     return {'device': device, 'status': status, 'running': running}
 
 
-def get_device_status(apic: APIC,
-                      devices: List[Something]) -> List[Dict[str, Something]]:
+def get_device_status(apic: APIC) -> List[Dict[str, Something]]:
     """Upgrade status for any device type"""
     # TODO this should probably be threaded.
     # May take a while for a large fabric.
     result = []
-    device_count = len(devices)
-    for i, device in enumerate(devices):
+    device_count = len(apic.devices)
+    for i, device in enumerate(apic.devices):
         if device['role'].value() == 'controller':
             res = get_apic_status(apic, device)
         elif device['nodeType'].value() == 'virtual':
@@ -410,15 +410,21 @@ def load_snapshot(apic: APIC) -> APIC:
         with open(fn, 'w') as f:
             log_i('Snapshot', 'Creating new snapshot %s...' % fn)
             apic.faults = [fault['dn'].value() for fault in faults]
-            f.write(json.dumps(apic.faults, indent=2))
+            apic.devices = get_devices(apic)
+            to_file = {
+                'faults': apic.faults,
+                'devices': [d.value() for d in apic.devices]
+            }
+            f.write(json.dumps(to_file, indent=2))
     else:
         with open(fn, 'r') as f:
             log_i('Snapshot', 'Loading snapshot %s...' % fn)
-            apic.faults = [dn for dn in json.loads(f.read())]
-            #
-            # defensive file reading
-            if not isinstance(apic.faults, list):
-                apic.faults = []
+            snapshot = json.loads(f.read())
+            apic.faults = [dn for dn in snapshot.get('faults', [])]
+            apic.devices = [Option(d) for d in snapshot.get('devices', [])]
+    # defensive file reading
+    apic.faults = apic.faults if isinstance(apic.faults, list) else []
+    apic.devices = apic.devices if isinstance(apic.devices, list) else []
     return apic
 
 
@@ -427,7 +433,8 @@ def check_faults(apic: APIC) -> None:
     new_faults = []
     for fault in current_faults:
         dn = fault['dn'].value()
-        if dn not in apic.faults:
+        severity = fault['severity'].value()
+        if dn not in apic.faults and severity != 'cleared':
             new_faults.append(fault)
     if len(new_faults) > 0:
         log_e('Fault Status',
@@ -447,10 +454,10 @@ def check_faults(apic: APIC) -> None:
         log_i('Fault Status', 'No new faults since snapshot.')
 
 
-def request_loop(apic: APIC, devices: List[Something]) -> None:
+def request_loop(apic: APIC) -> None:
     """Monitor status."""
     while True:
-        results = get_device_status(apic, devices)
+        results = get_device_status(apic)
         upgrade_state = parse_upgrade_state(apic, results)
         if upgrade_state == 'stable':
             check_faults(apic)
@@ -464,11 +471,10 @@ def request_loop(apic: APIC, devices: List[Something]) -> None:
 
 def main_loop(apic: APIC) -> None:
     """Login and handle connecitivity exceptions."""
-    devices = get_devices(apic)
     while True:
         try:
             login(apic)
-            request_loop(apic, devices)
+            request_loop(apic)
         except ConnectionError:
             log_w('Connection Failed', 'Trying again...')
             print('Note: this is expected on device restart.')
