@@ -14,7 +14,7 @@ pip install requests termcolor
 **Usage:**
 ```
 aci-github $ python upgrade_monitor.py -h
-usage: upgrade_monitor.py [-h] [-u USR] [-p PWD] [-v] [-d]
+usage: upgrade_monitor.py [-h] [-u USR] [-p PWD] [-v] [-s SNAPSHOT] [-d]
                           [--request_interval REQUEST_INTERVAL]
                           [--login_interval LOGIN_INTERVAL]
                           [--token_refresh_interval TOKEN_REFRESH_INTERVAL]
@@ -32,7 +32,9 @@ optional arguments:
   -p PWD, --password PWD
                         password
   -v, --verbose         verbose
-  -d, --debug           Debugging output
+  -s SNAPSHOT, --snapshot SNAPSHOT
+                        snapshot filename (default snapshot.json)
+  -d, --debug           Debugging output (print all JSON)
   --request_interval REQUEST_INTERVAL
                         Interval between querying devices (default 10s)
   --login_interval LOGIN_INTERVAL
