@@ -6,6 +6,7 @@ Licence: Apache
 This script is provided as is. No support is implied.
 
 """
+from __future__ import print_function
 from getpass import getpass
 from pprint import pformat
 import argparse
@@ -16,11 +17,6 @@ import time
 import traceback
 # import websocket
 
-try:
-    from typing import List, Dict, Union, Generic, TypeVar
-except ImportError:
-    print('This script requires python 3.')
-
 DEPS = ['requests', 'termcolor']
 
 try:
@@ -28,28 +24,25 @@ try:
     import urllib3  # type: ignore
     from termcolor import colored
     from requests.exceptions import ConnectionError, Timeout
-except ModuleNotFoundError:
+except ImportError:
     print('Please "pip install" the following dependencies and try again:')
     for dep in DEPS:
         print(dep)
     exit()
 
+if sys.version_info[0] == 2:
+    input = raw_input
+
 urllib3.disable_warnings()
 
 
-def inline_progress(message: str, percent: int) -> None:
-    """Print progress inline, overwriting current line"""
-    sys.stdout.write(message % percent + '\r')
-    sys.stdout.flush()
-
-
-def logger(color: str):
+def logger(color):
     """Log results"""
 
-    def _logger(header: str, data: Union[Dict, List, str], *args) -> None:
+    def _logger(header, data, *args):
         if isinstance(data, dict) or isinstance(data, list):
             print(colored('\n[%s]\n' % header, color), pformat(data))
-        else:
+        elif isinstance(data, str):
             print(colored('[%s]' % header, color), data, *args)
 
     return _logger
@@ -64,24 +57,21 @@ class AuthException(Exception):
     pass
 
 
-T = TypeVar('T')
-
-
-class Something(Generic[T]):
+class Something(object):
     """Option type wrapper for safe attribute access"""
 
-    def __init__(self, data: T):
+    def __init__(self, data):
         self.data = data
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         if self.data is None:
             return 'Nothing'
         return 'Something(%s)' % self.data.__repr__()
 
-    def __str__(self) -> str:
+    def __str__(self):
         return str(self.data)
 
-    def __getitem__(self, key: Union[str, int]):
+    def __getitem__(self, key):
         try:
             return Something(self.data[key])
         except (KeyError, TypeError):
@@ -93,17 +83,17 @@ class Something(Generic[T]):
                 if x is not None:
                     yield Option(x)
 
-    def __nonzero__(self) -> bool:
+    def __nonzero__(self):
         return self.data is not None
 
-    def __bool__(self) -> bool:
+    def __bool__(self):
         return self.data is not None
 
-    def value(self) -> T:
+    def value(self):
         return self.data
 
 
-def Option(data) -> Something:
+def Option(data):
     """Create option type"""
     if isinstance(data, Something):
         return data
@@ -115,7 +105,7 @@ def Option(data) -> Something:
 class APIC(object):
     """APIC state data"""
 
-    def __init__(self, options: argparse.Namespace):
+    def __init__(self, options):
         self.options = options
         self.jar = None
         self.start_time = time.time()
@@ -141,14 +131,16 @@ def request(apic, method, relative_url, data={}):
     return requests.get(url, cookies=apic.jar, verify=False, timeout=30)
 
 
-def get(apic: APIC, relative_url: str) -> Something:
+def get(apic, relative_url):
+    # type: (APIC, str) -> Something
     """Fetch and unwrap API request"""
     refresh_token(apic)
     res = request(apic, 'GET', relative_url)
     return Option(res.json())['imdata']
 
 
-def login(apic: APIC) -> APIC:
+def login(apic):
+    # type: (APIC) -> APIC
     """Login to the APIC"""
     res = request(
         apic, 'POST', '/api/aaaLogin', {
@@ -166,7 +158,8 @@ def login(apic: APIC) -> APIC:
     return apic
 
 
-def refresh_token(apic: APIC) -> APIC:
+def refresh_token(apic):
+    # type: (APIC) -> APIC
     """Check last token refresh and refresh if needed"""
     elapsed_time = time.time() - apic.last_refresh
     if elapsed_time > apic.options.token_refresh_interval:
@@ -176,7 +169,8 @@ def refresh_token(apic: APIC) -> APIC:
     return apic
 
 
-def get_options() -> argparse.Namespace:
+def get_options():
+    # type: () -> argparse.Namespace
     """Parse command line args."""
     DEFAULT_REQUEST_INTERVAL = 10
     DEFAULT_LOGIN_INTERVAL = 60
@@ -230,13 +224,15 @@ def get_options() -> argparse.Namespace:
     return args
 
 
-def get_devices(apic: APIC) -> List[Something]:
+def get_devices(apic):
+    # type: (APIC) -> List[Something]
     """Get list of all devices on fabric."""
     devices = get(apic, '/api/class/topSystem')
     return [d['topSystem']['attributes'] for d in devices]
 
 
-def get_apic_status(apic: APIC, device: Something) -> Dict[str, Something]:
+def get_apic_status(apic, device):
+    # type: (APIC, Something) -> Dict[str, Something]
     """Get APIC upgrade status."""
     dn = device['dn'].value()
     url_job = '/api/mo/%s/ctrlrfwstatuscont/upgjob' % dn
@@ -246,7 +242,8 @@ def get_apic_status(apic: APIC, device: Something) -> Dict[str, Something]:
     return {'device': device, 'status': status, 'running': running}
 
 
-def get_switch_status(apic: APIC, device: Something) -> Dict[str, Something]:
+def get_switch_status(apic, device):
+    # type: (APIC, Something) -> Dict[str, Something]
     """Get switch upgrade status."""
     dn = device['dn'].value()
     url_job = '/api/mo/%s/fwstatuscont/upgjob' % dn
@@ -256,7 +253,8 @@ def get_switch_status(apic: APIC, device: Something) -> Dict[str, Something]:
     return {'device': device, 'status': status, 'running': running}
 
 
-def get_device_status(apic: APIC) -> List[Dict[str, Something]]:
+def get_device_status(apic):
+    # type: (APIC) -> List[Dict[str, Something]]
     """Upgrade status for any device type"""
     # TODO this should probably be threaded.
     # May take a while for a large fabric.
@@ -282,12 +280,14 @@ def get_device_status(apic: APIC) -> List[Dict[str, Something]]:
             log_i('%s upgrade state' % name, res['status'].value())
             log_i('%s running state' % name, res['running'].value())
         else:
-            query_percent = round(100 * (i / device_count))
-            inline_progress('Querying devices: %d%%', query_percent)
+            query_percent = round(100 * (float(i) / device_count))
+            print('Querying devices: %d%%\r' % query_percent, end='')
+            sys.stdout.flush()
     return result  # List[{device: ..., status: ..., running: ...}]
 
 
-def parse_upgrade_state(apic: APIC, status: List[Dict[str, Something]]) -> str:
+def parse_upgrade_state(apic, status):
+    # type: (APIC, List[Dict[str, Something]]) -> str
     """Parse and print upgrade status details."""
     scheduled_devices = []
     queued_devices = []
@@ -391,7 +391,8 @@ def parse_upgrade_state(apic: APIC, status: List[Dict[str, Something]]) -> str:
     return 'upgrading'
 
 
-def get_faults(apic: APIC) -> List[Something]:
+def get_faults(apic):
+    # type: (APIC) -> List[Somethign]
     """Get fault list w/ details."""
     faults = get(apic, '/api/class/faultInfo')
     result = []
@@ -402,7 +403,8 @@ def get_faults(apic: APIC) -> List[Something]:
     return result
 
 
-def load_snapshot(apic: APIC) -> APIC:
+def load_snapshot(apic):
+    # type: (APIC) -> APIC
     """Load/create snapshot"""
     fn = apic.options.snapshot
     faults = get_faults(apic)
@@ -428,7 +430,8 @@ def load_snapshot(apic: APIC) -> APIC:
     return apic
 
 
-def check_faults(apic: APIC) -> None:
+def check_faults(apic):
+    # type: (APIC) -> None
     current_faults = get_faults(apic)
     new_faults = []
     for fault in current_faults:
@@ -454,7 +457,8 @@ def check_faults(apic: APIC) -> None:
         log_i('Fault Status', 'No new faults since snapshot.')
 
 
-def request_loop(apic: APIC) -> None:
+def request_loop(apic):
+    # type: (APIC) -> None
     """Monitor status."""
     while True:
         results = get_device_status(apic)
@@ -469,7 +473,8 @@ def request_loop(apic: APIC) -> None:
         time.sleep(apic.options.request_interval)
 
 
-def main_loop(apic: APIC) -> None:
+def main_loop(apic):
+    # type: (APIC) -> None
     """Login and handle connecitivity exceptions."""
     while True:
         try:
@@ -490,7 +495,8 @@ def main_loop(apic: APIC) -> None:
             print('Note: this is expected when the APIC first boots.')
 
 
-def main() -> None:
+def main():
+    # type: () -> None
     """Initial entry and top-level exception handling."""
     while True:
         try:
