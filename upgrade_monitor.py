@@ -17,13 +17,14 @@ import time
 import traceback
 # import websocket
 
-DEPS = ['requests', 'termcolor']
+DEPS = ['requests', 'termcolor', 'colorama']
 
 try:
     import requests
     import urllib3  # type: ignore
     from termcolor import colored
     from requests.exceptions import ConnectionError, Timeout
+    import colorama
 except ImportError:
     print('Please "pip install" the following dependencies and try again:')
     for dep in DEPS:
@@ -34,6 +35,7 @@ if sys.version_info[0] == 2:
     input = raw_input
 
 urllib3.disable_warnings()
+colorama.init()
 
 
 def logger(color):
