@@ -8,7 +8,7 @@ Monitor upgrade status of the ACI fabric.
 
 **Requirements:**
 ```
-pip install requests termcolor
+pip install requests termcolor colorama
 ```
 
 **Usage:**
