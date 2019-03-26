@@ -1,11 +1,3 @@
-"""Monitor ACI upgrade status
-
-Author: Nathan Hemingway, Cisco Business Critical Services
-Licence: Apache
-
-This script is provided as is. No support is implied.
-
-"""
 from __future__ import print_function
 from getpass import getpass
 from pprint import pformat
@@ -24,15 +16,17 @@ try:
     import urllib3  # type: ignore
     from termcolor import colored
     from requests.exceptions import ConnectionError, Timeout
-    import colorama
+    import colorama  # type: ignore
 except ImportError:
     print('Please "pip install" the following dependencies and try again:')
     for dep in DEPS:
         print(dep)
     exit()
 
-if sys.version_info[0] == 2:
-    input = raw_input
+if hasattr(__builtins__, 'raw_input'):  # type: ignore
+    compat_input = __builtins__.raw_input
+else:
+    compat_input = input
 
 urllib3.disable_warnings()
 colorama.init()
@@ -111,8 +105,8 @@ class APIC(object):
         self.options = options
         self.jar = None
         self.start_time = time.time()
-        self.faults = []  # type: List[str]
-        self.devices = []  # type: List[Something]
+        self.faults = []  # type: list[str]
+        self.devices = []  # type: list[Something]
         self.last_refresh = 0
 
 
@@ -227,14 +221,14 @@ def get_options():
 
 
 def get_devices(apic):
-    # type: (APIC) -> List[Something]
+    # type: (APIC) -> list[Something]
     """Get list of all devices on fabric."""
     devices = get(apic, '/api/class/topSystem')
     return [d['topSystem']['attributes'] for d in devices]
 
 
 def get_apic_status(apic, device):
-    # type: (APIC, Something) -> Dict[str, Something]
+    # type: (APIC, Something) -> dict[str, Something]
     """Get APIC upgrade status."""
     dn = device['dn'].value()
     url_job = '/api/mo/%s/ctrlrfwstatuscont/upgjob' % dn
@@ -245,7 +239,7 @@ def get_apic_status(apic, device):
 
 
 def get_switch_status(apic, device):
-    # type: (APIC, Something) -> Dict[str, Something]
+    # type: (APIC, Something) -> dict[str, Something]
     """Get switch upgrade status."""
     dn = device['dn'].value()
     url_job = '/api/mo/%s/fwstatuscont/upgjob' % dn
@@ -256,7 +250,7 @@ def get_switch_status(apic, device):
 
 
 def get_device_status(apic):
-    # type: (APIC) -> List[Dict[str, Something]]
+    # type: (APIC) -> list[dict[str, Something]]
     """Upgrade status for any device type"""
     # TODO this should probably be threaded.
     # May take a while for a large fabric.
@@ -285,11 +279,11 @@ def get_device_status(apic):
             query_percent = round(100 * (float(i) / device_count))
             print('Querying devices: %d%%\r' % query_percent, end='')
             sys.stdout.flush()
-    return result  # List[{device: ..., status: ..., running: ...}]
+    return result  # list[{device: ..., status: ..., running: ...}]
 
 
 def parse_upgrade_state(apic, status):
-    # type: (APIC, List[Dict[str, Something]]) -> str
+    # type: (APIC, list[dict[str, Something]]) -> str
     """Parse and print upgrade status details."""
     scheduled_devices = []
     queued_devices = []
@@ -394,7 +388,7 @@ def parse_upgrade_state(apic, status):
 
 
 def get_faults(apic):
-    # type: (APIC) -> List[Somethign]
+    # type: (APIC) -> list[Something]
     """Get fault list w/ details."""
     faults = get(apic, '/api/class/faultInfo')
     result = []
