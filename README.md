@@ -1,5 +1,11 @@
 # ACI upgrade status monitor
 
+**NOTE** This tool was ported to Go. The Go version provides pre-built, cross-platform binaries, has no dependencies, and runs significantly faster than this version. Unless integrating this into existing Python tooling, it's recommended to use the binary version.
+
+https://github.com/brightpuddle/aci-monitor
+
+## Overview
+
 This tool was originally developed to monitor the status of the upgrade status of Cisco ACI fabric. In addition to monitoring upgrade-specific status, it performs a snapshot/compare functionality to check for a change in fault state. Faults are triggered for a wide variety of events, including ISIS adjacency issues, internal MP-BGP adjancencies, COOP sync, etc. Because of this, it may also be useful as a general pre/post check tool to ensure network health throughout, and at the end of any ACI changes.
 
 
