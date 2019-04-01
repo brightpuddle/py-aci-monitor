@@ -403,14 +403,13 @@ def load_snapshot(apic):
     # type: (APIC) -> APIC
     """Load/create snapshot"""
     fn = apic.options.snapshot
-    faults = get_faults(apic)
     if not os.path.isfile(fn):
         with open(fn, 'w') as f:
             log_i('Snapshot', 'Creating new snapshot %s...' % fn)
-            apic.faults = [fault['dn'].value() for fault in faults]
+            apic.faults = get_faults(apic)
             apic.devices = get_devices(apic)
             to_file = {
-                'faults': apic.faults,
+                'faults': [f.value() for f in apic.faults],
                 'devices': [d.value() for d in apic.devices]
             }
             f.write(json.dumps(to_file, indent=2))
@@ -418,7 +417,7 @@ def load_snapshot(apic):
         with open(fn, 'r') as f:
             log_i('Snapshot', 'Loading snapshot %s...' % fn)
             snapshot = json.loads(f.read())
-            apic.faults = [dn for dn in snapshot.get('faults', [])]
+            apic.faults = [Option(f) for f in snapshot.get('faults', [])]
             apic.devices = [Option(d) for d in snapshot.get('devices', [])]
     # defensive file reading
     apic.faults = apic.faults if isinstance(apic.faults, list) else []
@@ -428,13 +427,14 @@ def load_snapshot(apic):
 
 def check_faults(apic):
     # type: (APIC) -> None
-    current_faults = get_faults(apic)
     new_faults = []
-    for fault in current_faults:
-        dn = fault['dn'].value()
-        severity = fault['severity'].value()
-        if dn not in apic.faults and severity != 'cleared':
-            new_faults.append(fault)
+    for current_fault in get_faults(apic):
+        new_fault = True
+        for previous_fault in apic.faults:
+            if previous_fault['dn'].value() == current_fault['dn'].value():
+                new_fault = False
+        if new_fault and current_fault['severity'].value() != 'cleared':
+            new_faults.append(current_fault)
     if len(new_faults) > 0:
         log_w('Fault Status',
               '%s new fault(s) since previous snapshot.' % len(new_faults))
