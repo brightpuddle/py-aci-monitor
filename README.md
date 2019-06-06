@@ -1,6 +1,6 @@
 # ACI upgrade status monitor
 
-**NOTE** This tool was ported to Go. The Go version provides pre-built, cross-platform binaries, has no dependencies, and runs significantly faster than this version. Unless integrating this into existing Python tooling, it's recommended to use the binary version.
+**NOTE** This tool was ported to Go. This codebase is receiving no further updates and is here for reference only. The Go version provides pre-built, cross-platform binaries, has no dependencies, and runs significantly faster than this version.
 
 https://github.com/brightpuddle/aci-monitor
 
