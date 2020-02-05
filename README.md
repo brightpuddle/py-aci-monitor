@@ -1,8 +1,11 @@
-# ACI upgrade status monitor
+# Deprecation notice
 
-**NOTE** This tool was ported to Go. This codebase is receiving no further updates and is here for reference only. The Go version provides pre-built, cross-platform binaries, has no dependencies, and runs significantly faster than this version.
+This tool was ported to Go before it reached production. This codebase is receiving no further updates and is here for reference. The Go version has received a number of enhancements and is widely used in proudction. The Go version can be found here:
 
 https://github.com/brightpuddle/aci-monitor
+
+# ACI upgrade status monitor
+
 
 ## Overview
 
