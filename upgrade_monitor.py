@@ -7,7 +7,6 @@ import os
 import sys
 import time
 import traceback
-# import websocket
 
 DEPS = ['requests', 'termcolor', 'colorama']
 
@@ -34,7 +33,6 @@ colorama.init()
 
 def logger(color):
     """Log results"""
-
     def _logger(header, data, *args):
         if isinstance(data, dict) or isinstance(data, list):
             print(colored('\n[%s]\n' % header, color), pformat(data))
@@ -118,12 +116,11 @@ def request(apic, method, relative_url, data={}):
     if apic.options.verbose:
         log_i(method, url)
     if method == 'POST':
-        return requests.post(
-            url,
-            cookies=apic.jar,
-            data=json.dumps(data),
-            verify=False,
-            timeout=30)
+        return requests.post(url,
+                             cookies=apic.jar,
+                             data=json.dumps(data),
+                             verify=False,
+                             timeout=30)
     return requests.get(url, cookies=apic.jar, verify=False, timeout=30)
 
 
@@ -174,20 +171,21 @@ def get_options():
     parser = argparse.ArgumentParser(description='Monitor ACI upgrade status.')
     parser.add_argument('-u', '--username', dest='usr', help='username')
     parser.add_argument('-p', '--password', dest='pwd', help='password')
-    parser.add_argument(
-        '-v', '--verbose', dest="verbose", action='store_true', help='verbose')
-    parser.add_argument(
-        '-s',
-        '--snapshot',
-        dest='snapshot',
-        default='snapshot.json',
-        help='snapshot filename (default snapshot.json)')
-    parser.add_argument(
-        '-d',
-        '--debug',
-        dest="debug",
-        action='store_true',
-        help='Debugging output (print all JSON)')
+    parser.add_argument('-v',
+                        '--verbose',
+                        dest="verbose",
+                        action='store_true',
+                        help='verbose')
+    parser.add_argument('-s',
+                        '--snapshot',
+                        dest='snapshot',
+                        default='snapshot.json',
+                        help='snapshot filename (default snapshot.json)')
+    parser.add_argument('-d',
+                        '--debug',
+                        dest="debug",
+                        action='store_true',
+                        help='Debugging output (print all JSON)')
     parser.add_argument(
         '--request_interval',
         dest='request_interval',
@@ -202,13 +200,12 @@ def get_options():
         default=DEFAULT_LOGIN_INTERVAL,
         help='Interval between APIC login attempts (default %ss)' %
         DEFAULT_LOGIN_INTERVAL)
-    parser.add_argument(
-        '--token_refresh_interval',
-        dest='token_refresh_interval',
-        type=int,
-        default=DEFAULT_TOKEN_REFRESH,
-        help='Seconds between token refresh (default %ss)' %
-        DEFAULT_TOKEN_REFRESH)
+    parser.add_argument('--token_refresh_interval',
+                        dest='token_refresh_interval',
+                        type=int,
+                        default=DEFAULT_TOKEN_REFRESH,
+                        help='Seconds between token refresh (default %ss)' %
+                        DEFAULT_TOKEN_REFRESH)
     parser.add_argument('ip', help='APIC IP address')
     args = parser.parse_args()
     if not args.usr:
@@ -409,15 +406,17 @@ def load_snapshot(apic):
             apic.faults = get_faults(apic)
             apic.devices = get_devices(apic)
             to_file = {
-                'faults': [f.value() for f in apic.faults],
-                'devices': [d.value() for d in apic.devices]
+                'faults': [fault.value() for fault in apic.faults],
+                'devices': [device.value() for device in apic.devices]
             }
             f.write(json.dumps(to_file, indent=2))
     else:
         with open(fn, 'r') as f:
             log_i('Snapshot', 'Loading snapshot %s...' % fn)
             snapshot = json.loads(f.read())
-            apic.faults = [Option(f) for f in snapshot.get('faults', [])]
+            apic.faults = [
+                Option(fault) for fault in snapshot.get('faults', [])
+            ]
             apic.devices = [Option(d) for d in snapshot.get('devices', [])]
     # defensive file reading
     apic.faults = apic.faults if isinstance(apic.faults, list) else []
